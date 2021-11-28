@@ -3,12 +3,13 @@ import random
 from enum import Enum
 from collections import namedtuple
 import numpy as np
+from PIL import Image
 
 print("initializing pygame \n")
 pygame.init()
 print("finished initializing\n")
-font = pygame.font.Font('arial.ttf', 25)
-#font = pygame.font.SysFont('arial', 25)
+# font = pygame.font.Font('arial.ttf', 25)
+font = pygame.font.SysFont('arial', 25)
 
 class Direction(Enum):
     RIGHT = 1
@@ -158,6 +159,18 @@ class SnakeGameAI:
             y -= BLOCK_SIZE
 
         self.head = Point(x, y)
+
+    # takes a snapshot of the game, make it gray scale, resize it, and then return it as a numpy array
+    def snapshot(self):
+        snapshot = pygame.image.tostring(self.display, 'RGB')
+        img = Image.frombytes('RGB', (self.w, self.h), snapshot)
+        img = img.convert('L')
+        img = img.resize((256, 256))
+        img_matrix = np.asarray(img.getdata(), dtype=np.uint8)
+        img_matrix = (img_matrix - 128) / (128 - 1)
+        img_matrix = img_matrix.reshape(1, 1, img.size[0], img.size[1])
+        return img_matrix
+
 
 def calEuclideanDistance(head, apple):
     return (head.x/BLOCK_SIZE - apple.x/BLOCK_SIZE)**2 + (head.y/BLOCK_SIZE - apple.y/BLOCK_SIZE)**2

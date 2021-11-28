@@ -4,6 +4,9 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import os
+import keras
+from keras import layers
+from keras import optimizers
 
 class Linear_QNet(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -24,6 +27,66 @@ class Linear_QNet(nn.Module):
         file_name = os.path.join(model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
 
+class CNN(nn.Module):
+    def __init__(self, hidden_size, output_size):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3, stride=1, padding=1)
+        self.linear1 = nn.Linear(256 * 256 , hidden_size)
+        self.linear2 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = torch.flatten(x, start_dim=1)
+      
+        x = F.relu(self.linear1(x))
+        x = self.linear2(x)
+        return x
+
+    def save(self, file_name='model.pth'):
+        model_folder_path = './model'
+        if not os.path.exists(model_folder_path):
+            os.makedirs(model_folder_path)
+
+        file_name = os.path.join(model_folder_path, file_name)
+        torch.save(self.state_dict(), file_name)
+
+# class CNN(nn.Module):
+#     def __init__(self, num_actions, input_shape, alpha=0.1, gamma=0.99,
+#                  dropout_rate=0.1, load_path='', logger=None):
+    
+#     self.num_actions = num_actions  # Size of the network output
+#     self.gamma = gamma
+#     self.alpha = alpha
+#     self.dropout_rate = dropout_rate
+#     self.model = keras.Sequential()
+
+#     # build CNN model
+#     self.model.add(layers.Conv2D(filters=32, 
+#                                 kernel_size=8, 
+#                                 stride=4, 
+#                                 padding='same', 
+#                                 activation='relu'))
+#     self.model.add(layers.Conv2D(filters=64, 
+#                                 kernel_size=4, 
+#                                 stride=2, 
+#                                 padding='same', 
+#                                 activation='relu'))
+#     self.model.add(Flatten())
+#     self.model.add(Dropout(self.dropout_rate))
+#     self.model.add(Dense(units=512, activation='relu'))
+#     self.model.add(Dense(self.num_actions))
+
+#     self.model.compile(loss='mean_squared_error', 
+#                         optimizer=optimizers.Adam(),
+#                         metrics=['accuracy']
+#                         )
+    
+
+
+
 
 class QTrainer:
     def __init__(self, model, lr, gamma):
@@ -39,23 +102,30 @@ class QTrainer:
         action = torch.tensor(np.array(action), dtype=torch.long)
         reward = torch.tensor(np.array(reward), dtype=torch.float)
         # (n, x)
-
-        if len(state.shape) == 1:
+        # if len(state.shape) == 1:
+        # print('state size: ', state.size())
+        state_size = list(state.size())
+        # print('state size : ', state_size)
+        if type(done) == bool:
             # (1, x)
-            state = torch.unsqueeze(state, 0)
-            next_state = torch.unsqueeze(next_state, 0)
+            # state = torch.unsqueeze(state, 0)
+            # next_state = torch.unsqueeze(next_state, 0)
             action = torch.unsqueeze(action, 0)
             reward = torch.unsqueeze(reward, 0)
             done = (done, )
+        # print('state size afte: ', state.size())
 
         # 1: predicted Q values with current state
         pred = self.model(state)
-
+       
         target = pred.clone()
+       
         for idx in range(len(done)):
             Q_new = reward[idx]
             if not done[idx]:
-                Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
+                # Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
+                Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state))
+
 
             target[idx][torch.argmax(action[idx]).item()] = Q_new
     
