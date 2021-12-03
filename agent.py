@@ -3,13 +3,18 @@ import random
 import numpy as np
 from collections import deque
 from game import SnakeGameAI, Direction, Point
-from model import Linear_QNet, QTrainer
+from model import Linear_QNet, QTrainer, CNN
+import pygame
+from pygame.locals import *
+import sys
+import os
 # from helper import plot
 
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
 LR = 0.001
-NUM_ITERATION_DEATHS = 500
+NUM_ITERATION_DEATHS = 100
+SCREEN_SIZE = 300
 
 class Agent:
 
@@ -18,7 +23,8 @@ class Agent:
         self.epsilon = 5 # randomness
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        self.model = Linear_QNet(11, 256, 3)
+        # self.model = Linear_QNet(11, 256, 3)
+        self.model = CNN(512, 3)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
         self.scores = []
@@ -71,6 +77,9 @@ class Agent:
 
         return np.array(state, dtype=int)
 
+
+    
+
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done)) # popleft if MAX_MEMORY is reached
 
@@ -97,7 +106,7 @@ class Agent:
             final_move[move] = 1
         else:
             state0 = torch.tensor(state, dtype=torch.float)
-            prediction = self.model(state0)
+            prediction = self.model(np.reshape(state0, (1, 1, 60,60)))
             move = torch.argmax(prediction).item()
             final_move[move] = 1
 
@@ -106,6 +115,7 @@ class Agent:
 
 import matplotlib.pyplot as plt
 from IPython import display
+
 
 
 def plot(scores, mean_scores):
@@ -122,7 +132,6 @@ def plot(scores, mean_scores):
     plt.show(block=False)
     # plt.pause(.1)
 
-
 def train():
     plot_scores = [0]
     plot_mean_scores = [0]
@@ -136,14 +145,15 @@ def train():
 
     while(True): #iteratios
         # get old state
-        state_old = agent.get_state(game)
-
+        # state_old = agent.get_state(game)
+        state_old = game.screenshot()
         # get move
         final_move = agent.get_action(state_old)
 
         # perform move and get new state
         reward, done, score = game.play_step(final_move)
-        state_new = agent.get_state(game)
+        # state_new = agent.get_state(game)
+        state_new = game.screenshot()
 
         # train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
@@ -168,8 +178,8 @@ def train():
             agent.mean_scores.append(mean_score)
             deaths += 1
             # plot(plot_scores, plot_mean_scores)
-        # if deaths == NUM_ITERATION_DEATHS:
-        #     break
+        if deaths == NUM_ITERATION_DEATHS:
+            break
     plot(agent.scores, agent.mean_scores)
 
 if __name__ == '__main__':
